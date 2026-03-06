@@ -173,6 +173,8 @@ urlpatterns = [
     path('logo.png', RedirectView.as_view(url='/static/logo.png', permanent=True)),
     # 提供 /static/logo.png：优先取 app 静态目录，缺省回退到仓库根 logo.png
     path('static/logo.png', static_logo, name='static_logo'),
+    # 兼容路径：/api/static/logo.png（防止 baseURL 含路径时产生双重前缀）
+    path('api/static/logo.png', static_logo, name='api_static_logo'),
 ]
 
 # 仅上线( DEBUG=0 )时接管根路径 '/'，本地开发( DEBUG=1 )不注册该路由，避免影响 Vite dev server/本地访问

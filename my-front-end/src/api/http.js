@@ -57,6 +57,13 @@ function buildBaseURL() {
   } catch {
     url = DEFAULT_BASE
   }
+  // 确保只保留 origin（scheme://host:port），去掉用户可能误输入的路径部分
+  // 避免 baseURL 含路径导致 axios 拼接出 /api/api/... 双重前缀
+  try {
+    url = new URL(url).origin
+  } catch {
+    // URL 解析失败时保持原值
+  }
   return url
 }
 

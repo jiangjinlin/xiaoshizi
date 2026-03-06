@@ -14,6 +14,19 @@ class SessionAuthMiddlewareTests(TestCase):
             self.assertEqual(resp.status_code, 200, f"公共接口 {url} 不应被拦截")
             self.assertTrue(resp.json().get('success') is True)
 
+    def test_logout_accessible_without_login(self):
+        # 退出登录应允许未登录调用（幂等操作），避免前端因会话过期时 POST /api/logout 收到 401 死循环
+        resp = self.client.post('/api/logout', {}, content_type='application/json')
+        self.assertNotEqual(resp.status_code, 401, "/api/logout 不应因未登录返回 401")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json().get('success'))
+
+    def test_static_logo_accessible_without_login(self):
+        # 静态文件不应被登录校验拦截（包括带有 /api/ 前缀的兼容路径）
+        for url in ['/static/logo.png', '/api/static/logo.png']:
+            resp = self.client.get(url)
+            self.assertNotEqual(resp.status_code, 401, f"静态资源 {url} 不应因未登录返回 401")
+
     def test_protected_endpoint_requires_login(self):
         resp = self.client.get('/api/score-query')
         self.assertEqual(resp.status_code, 401)
