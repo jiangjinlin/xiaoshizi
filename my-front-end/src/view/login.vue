@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiLogin } from '../api/index'
-import { getLanConfig } from '../api/http'
+import { getStaticURL } from '../api/http'
 
 const username = ref('')
 const password = ref('')
@@ -15,8 +15,7 @@ const router = useRouter()
 const logoUrl = ref('')
 onMounted(() => {
   try {
-    const base = (getLanConfig().baseURL || '').replace(/\/$/, '')
-    logoUrl.value = base + '/static/logo.png'
+    logoUrl.value = getStaticURL('/static/logo.png')
   } catch {
     logoUrl.value = '/static/logo.png'
   }

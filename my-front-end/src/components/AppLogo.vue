@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { getLanConfig } from '../api/http'
+import { getStaticURL } from '../api/http'
 
 const props = defineProps({
   height: { type: [Number, String], default: 36 },
@@ -10,8 +10,7 @@ const props = defineProps({
 const logoUrl = ref('/static/logo.png')
 onMounted(() => {
   try {
-    const base = (getLanConfig().baseURL || '').replace(/\/$/, '')
-    logoUrl.value = base + '/static/logo.png'
+    logoUrl.value = getStaticURL('/static/logo.png')
   } catch {
     logoUrl.value = '/static/logo.png'
   }

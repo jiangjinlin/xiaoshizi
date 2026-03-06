@@ -1,16 +1,29 @@
 import axios from 'axios'
 
-// 局域网测试：默认使用当前页面主机:8000（如 192.168.x.x:8000），可在“网络设置”中改为自定义
+// 生产环境优先使用同域根路径，便于 Nginx/IIS 反向代理；开发环境保留局域网直连逻辑
+function isProdEnv() {
+  try {
+    return Boolean(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD)
+  } catch {
+    return false
+  }
+}
+
+function joinUrl(base, path = '') {
+  const cleanBase = (base || '').replace(/\/$/, '')
+  const cleanPath = path.startsWith('/') ? path : `/${path}`
+  return `${cleanBase}${cleanPath}`
+}
+
 function computeDefaultBase() {
+  if (isProdEnv()) return ''
   try {
     if (typeof window !== 'undefined' && window.location) {
       const { protocol, hostname } = window.location
       const proto = /^https:/i.test(protocol) ? 'https' : 'http'
-      // 开发环境默认后端端口 8000
       return `${proto}://${hostname}:8000`
     }
   } catch {}
-  // 兜底
   return 'http://localhost:8000'
 }
 const DEFAULT_BASE = computeDefaultBase()
@@ -41,7 +54,7 @@ function buildBaseURL() {
   try {
     if (!/^https?:\/\//i.test(url)) {
       // 未显式协议：补 http://，若无端口则默认 8000
-      if (/^\[[0-9a-fA-F:]+\](:\d+)?$/.test(url)) {
+      if (/^\[[0-9a-fA-F:]+](:\d+)?$/.test(url)) {
         // IPv6 形式 [::1]:8000 或 [::1]
         if (!/:\d+]$/.test(url)) url = `${url}:8000`
         url = `http://${url}`
@@ -57,7 +70,7 @@ function buildBaseURL() {
   } catch {
     url = DEFAULT_BASE
   }
-  return url
+  return url.replace(/\/$/, '')
 }
 
 export const http = axios.create({
@@ -80,6 +93,9 @@ export function getLanConfig() {
 }
 export function getDefaultBaseURL() {
   return DEFAULT_BASE
+}
+export function getStaticURL(path = '/static/logo.png') {
+  return joinUrl(buildBaseURL(), path)
 }
 
 // 请求拦截：GET 防缓存 & 统一 headers
