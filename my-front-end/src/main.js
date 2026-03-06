@@ -37,7 +37,11 @@ app.mount('#app')
     return list.length
   }
   function apiBase(){
-    try { return (getLanConfig().baseURL || '').replace(/\/$/, '') } catch { return '' }
+    try {
+      const raw = (getLanConfig().baseURL || '').replace(/\/$/, '')
+      // 只保留 origin，防止 baseURL 含路径时拼出 /api/api/logout
+      return new URL(raw).origin
+    } catch { return '' }
   }
   function sendLogout(){
     if (logoutSent) return

@@ -37,6 +37,7 @@ class SessionAuthRequiredMiddleware(MiddlewareMixin):
         '/api',             # index 不带斜杠（补充）
         '/api/overview',
         '/api/exam-select', # 新增：公开已发布考试列表
+        '/api/logout',      # 退出登录应允许未登录调用（幂等操作，避免 401 循环）
     }
 
     def _single_session_enforce(self, request):
@@ -70,6 +71,11 @@ class SessionAuthRequiredMiddleware(MiddlewareMixin):
     def process_request(self, request):
         path = request.path.rstrip('/') + ('/' if request.path.endswith('/') else '')  # 标准化末尾斜杠
         if not path.startswith('/api/'):
+            return None
+        # 静态/媒体文件路径不需要登录校验，即使带有 /api/ 前缀也直接放行
+        # 使用 startswith 精确匹配路径前缀，防止 'static' 出现在路径中间被误匹配
+        if (request.path.startswith('/static/') or request.path.startswith('/media/')
+                or request.path.startswith('/api/static/') or request.path.startswith('/api/media/')):
             return None
         # 白名单直接放行（支持两种形式）
         if path in self.PUBLIC_PATHS or request.path in self.PUBLIC_PATHS:
