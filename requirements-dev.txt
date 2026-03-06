@@ -1,0 +1,4 @@
+# Optional development-only dependencies
+pytest>=7.0
+pytest-django>=4.5
+

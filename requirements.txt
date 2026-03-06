@@ -1,0 +1,21 @@
+# Backend requirements for 在线考试系统（Django + DRF）
+#
+# Notes:
+# - This project uses MySQL in settings.py, so we include mysqlclient.
+#   If you prefer a pure-python driver, switch to PyMySQL and update settings accordingly.
+# - Face recognition uses Pillow for local aHash and an in-repo Baidu AIP SDK (imported via sys.path).
+
+Django==5.2.4
+djangorestframework>=3.15,<4.0
+
+django-cors-headers>=4.3,<5.0
+
+Pillow>=10.0
+openpyxl>=3.1
+python-pptx>=0.6.23
+
+# WSGI server (Windows friendly)
+waitress>=2.1
+
+# MySQL driver (required when DATABASE ENGINE is django.db.backends.mysql)
+mysqlclient>=2.2

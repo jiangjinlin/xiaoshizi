@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中职计算机专业无纸化考试系统</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        secondary: '#4f46e5'
+                    },
+                    borderRadius: {
+                        'none': '0px',
+                        'sm': '2px',
+                        DEFAULT: '4px',
+                        'md': '8px',
+                        'lg': '12px',
+                        'xl': '16px',
+                        '2xl': '20px',
+                        '3xl': '24px',
+                        'full': '9999px',
+                        'button': '4px'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            min-height: 1024px;
+        }
+        .hero-section {
+            background-image: url('https://ai-public.mastergo.com/ai/img_res/8b68e5a2f3b54ec2e39de53429c5a467.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <img src="/logo.png" alt="站点LOGO" class="h-10 w-auto select-none"/>
+                    <div class="ml-10 flex items-center space-x-8">
+                        <a href="#" class="text-gray-900 hover:text-primary">首页</a>
+                        <a href="#" class="text-gray-900 hover:text-primary">系统介绍</a>
+                        <a href="#" class="text-gray-900 hover:text-primary">功能特点</a>
+                        <a href="#" class="text-gray-900 hover:text-primary">技术支持</a>
+                        <a href="#" class="text-gray-900 hover:text-primary">联系我们</a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="!rounded-button bg-primary text-white px-6 py-2 hover:bg-primary/90" onclick="window.location.href='/login'">登录系统</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero-section">
+        <div class="max-w-7xl mx-auto px-4 py-20">
+            <div class="w-1/2">
+                <h1 class="text-5xl font-bold text-gray-900 mb-6">智能无纸化考试系统</h1>
+                <p class="text-xl text-gray-700 mb-8">基于 Python 开发的新一代智能考试平台，集成指纹识别技术，为中职院校提供安全、高效的考试解决方案。</p>
+                <div class="flex space-x-4">
+                    <button class="!rounded-button bg-primary text-white px-8 py-3 text-lg hover:bg-primary/90" onclick="window.location.href='/login'">开始使用</button>
+                    <button class="!rounded-button bg-white text-primary px-8 py-3 text-lg border border-primary hover:bg-gray-50">了解更多</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-16">核心功能特点</h2>
+            <div class="grid grid-cols-3 gap-8">
+                <div class="p-8 bg-gray-50 rounded-lg">
+                    <div class="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-fingerprint text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">指纹身份认证</h3>
+                    <p class="text-gray-600">采用先进的指纹识别技术，确保考生身份真实可靠，有效防止替考作弊行为。</p>
+                </div>
+                <div class="p-8 bg-gray-50 rounded-lg">
+                    <div class="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-tasks text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">多题型支持</h3>
+                    <p class="text-gray-600">支持选择题、判断题、Office 操作题等多种题型，满足不同考试场景需求。</p>
+                </div>
+                <div class="p-8 bg-gray-50 rounded-lg">
+                    <div class="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mb-6">
+                        <i class="fas fa-chart-line text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">智能评分分析</h3>
+                    <p class="text-gray-600">自动评分系统配合人工审核，提供详细的成绩分析报告和数据可视化。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-16">系统数据概览</h2>
+            <div class="grid grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold mb-6">考试成绩分布</h3>
+                    <div id="scoreChart" class="w-full h-80"></div>
+                </div>
+                <div class="bg-white p-8 rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold mb-6">题型正确率分析</h3>
+                    <div id="accuracyChart" class="w-full h-80"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-16">使用流程</h2>
+            <div class="flex justify-between items-start">
+                <div class="text-center px-4 w-1/4">
+                    <div class="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-user-plus text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-4">注册绑定</h3>
+                    <p class="text-gray-600">录入指纹信息并绑定学生账号</p>
+                </div>
+                <div class="text-center px-4 w-1/4">
+                    <div class="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-sign-in-alt text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-4">身份验证</h3>
+                    <p class="text-gray-600">考试前进行指纹身份验证</p>
+                </div>
+                <div class="text-center px-4 w-1/4">
+                    <div class="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-edit text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-4">在线答题</h3>
+                    <p class="text-gray-600">完成线上考试答题</p>
+                </div>
+                <div class="text-center px-4 w-1/4">
+                    <div class="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-chart-bar text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-4">查看成绩</h3>
+                    <p class="text-gray-600">获取详细的成绩分析报告</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="grid grid-cols-4 gap-8">
+                <div>
+                    <img src="/logo.png" alt="站点LOGO" class="h-12 w-auto mb-6 select-none"/>
+                    <p class="text-gray-400">基于 Python 的智能无纸化考试系统</p>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">快速链接</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">系统介绍</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">功能特点</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">技术支持</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">联系我们</h4>
+                    <ul class="space-y-2">
+                        <li class="text-gray-400">电话：19961148075</li>
+                        <li class="text-gray-400">邮箱：2300035250@qq.com</li>
+                        <li class="text-gray-400">地址：海科路皇家女子学院</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">关注我们</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-weixin text-2xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-weibo text-2xl"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
+                <p>© 2024 中职计算机专业无纸化考试系统. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const scoreChart = echarts.init(document.getElementById('scoreChart'));
+        const accuracyChart = echarts.init(document.getElementById('accuracyChart'));
+        const scoreOption = {
+            animation: false,
+            tooltip: {
+                trigger: 'axis'
+            },
+            xAxis: {
+                type: 'category',
+                data: ['60分以下', '60-70分', '70-80分', '80-90分', '90分以上']
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [{
+                data: [12, 25, 45, 32, 18],
+                type: 'bar',
+                itemStyle: {
+                    color: '#2563eb'
+                }
+            }]
+        };
+        const accuracyOption = {
+            animation: false,
+            tooltip: {
+                trigger: 'item'
+            },
+            series: [{
+                type: 'pie',
+                radius: '60%',
+                data: [
+                    {value: 10, name: '选择题'},
+                    {value: 10, name: '多选题'},
+                    {value: 10, name: '判断题'},
+                    {value: 10, name: 'Office操作题'}
+                ],
+                itemStyle: {
+                    color: function(params) {
+                        const colors = ['#2563eb', '#4f46e5', '#6366f1', '#818cf8'];
+                        return colors[params.dataIndex];
+                    }
+                }
+            }]
+        };
+
+        scoreChart.setOption(scoreOption);
+        accuracyChart.setOption(accuracyOption);
+        window.addEventListener('resize', function() {
+            scoreChart.resize();
+            accuracyChart.resize();
+        });
+    </script>
+</body>
+</html>

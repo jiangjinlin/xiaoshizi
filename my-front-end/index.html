@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中职计算机专业无纸化考试系统</title>
+    <!-- Remove static tailwind link; Vite bundles CSS via JS imports -->
+    <!-- <link rel="stylesheet" href="/dist/tailwind.css"> -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+    <script>
+      // Apply saved/system theme before paint to avoid FOUC and ensure [data-theme] is set
+      (function(){
+        try{
+          var stored = localStorage.getItem('theme')
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          var t = stored || (prefersDark ? 'dark' : 'light')
+          document.documentElement.dataset.theme = t
+        }catch(e){ document.documentElement.dataset.theme = 'light' }
+      })()
+    </script>
+    <style>
+        body { min-height: 1024px; }
+        .hero-section {
+            background-image: url('https://ai-public.mastergo.com/ai/img_res/8b68e5a2f3b54ec2e39de53429c5a467.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
