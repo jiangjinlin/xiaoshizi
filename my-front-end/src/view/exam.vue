@@ -13,6 +13,7 @@ const totalVisible = ref(0)
 const router = useRouter()
 const route = useRoute()
 const isScrolled = ref(false)
+const faceRequired = ref(true)
 
 // 已提交考试映射：exam_id -> true
 const submittedMap = ref({})
@@ -51,12 +52,15 @@ function onFilter(type) {
 async function ensureSignedIn(examId) {
   try {
     const { data } = await apiFaceStatus({ exam_id: examId })
+    faceRequired.value = typeof data?.face_required === 'boolean' ? data.face_required : true
+    if (!faceRequired.value) return true
     if (!data?.signed_in) {
       router.push({ path:'/signin', query:{ exam_id: String(examId) } })
       return false
     }
     return true
   } catch {
+    if (!faceRequired.value) return true
     router.push({ path:'/signin', query:{ exam_id: String(examId) } })
     return false
   }
@@ -164,8 +168,9 @@ onMounted(async () => {
   window.addEventListener('scroll', handleScroll, { passive:true })
   await loadSubmitted()
   await examStore.fetchExams()
-  // 若未找到对应考试，跳转选择页
   if (!filteredExams.value.length){ router.replace('/exam_select'); return }
+  const ok = await ensureSignedIn(selectedExamId.value)
+  if (!ok) return
   computeTotalVisible()
 })
 onUnmounted(() => window.removeEventListener('scroll', handleScroll))
@@ -194,6 +199,9 @@ function hasInlineChoices(text){
 
     <!-- 主体 -->
     <div class="max-w-5xl mx-auto pt-24 pb-20 px-4 lg:px-6">
+      <div v-if="!faceRequired" class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700">
+        当前已关闭人脸识别，本场考试可直接作答并提交。
+      </div>
       <!-- 顶部题型筛选条 -->
       <div class="rounded-2xl border border-gray-200 bg-white/70 backdrop-blur p-5 mb-6 shadow-sm">
         <div class="flex flex-wrap gap-3 items-center justify-center">

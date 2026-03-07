@@ -10,6 +10,7 @@ const s = useSyllabusStore()
 const loading = ref(true)
 const exams = ref([])
 const err = ref('')
+const faceRequired = ref(true)
 
 async function load(){
   loading.value = true
@@ -18,13 +19,17 @@ async function load(){
     // 使用 /api/exam-select (已发布考试列表，不限制当前时间窗口)
     const { data } = await apiExamSelect()
     if (data?.success){
-      exams.value = (data.exams||[]).map(e=>({
-        id: e.id || e.exam_id,
-        title: e.title,
-        start_time: e.start_time,
-        end_time: e.end_time,
-        duration: e.duration
-      }))
+      faceRequired.value = !!data?.face_required
+      exams.value = (data.exams||[]).map(e=>(
+        {
+          id: e.id || e.exam_id,
+          title: e.title,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          duration: e.duration,
+          face_required: typeof e.face_required === 'boolean' ? e.face_required : !!data?.face_required,
+        }
+      ))
     }else{
       err.value = data?.error_msg || '加载考试列表失败'
     }
@@ -43,8 +48,13 @@ async function load(){
 
 async function chooseExam(exam){
   const id = Number(exam.id)
+  const needFace = typeof exam?.face_required === 'boolean' ? exam.face_required : faceRequired.value
   try{ sessionStorage.setItem('last_exam_id', String(id)) }catch{}
-  router.push({ path: '/signin', query: { exam_id: String(id) } })
+  if (needFace) {
+    router.push({ path: '/signin', query: { exam_id: String(id) } })
+    return
+  }
+  router.push({ path: '/exam', query: { exam_id: String(id) } })
 }
 
 function goBack(){ router.push('/student') }
@@ -71,6 +81,11 @@ onMounted(load)
     <div class="max-w-4xl mx-auto pt-24 pb-16 px-4">
       <div class="rounded-2xl border border-gray-200 bg-white/80 p-6 shadow-sm">
         <h1 class="text-xl font-semibold text-gray-900 mb-4">请选择要参加的考试</h1>
+        <div v-if="!loading && !err" class="mb-4 flex flex-wrap items-center gap-2 text-xs">
+          <span :class="['inline-flex items-center rounded-full px-3 py-1 border', faceRequired ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700']">
+            {{ faceRequired ? '当前考试需先进行人脸验证' : '当前已关闭人脸验证，可直接进入考试' }}
+          </span>
+        </div>
         <div v-if="loading" class="text-sm text-gray-500">加载中...</div>
         <div v-else-if="err" class="text-sm text-red-600">{{ err }}</div>
         <div v-else>
@@ -81,7 +96,7 @@ onMounted(load)
               <div class="mt-1 text-xs text-gray-500">时间：{{ exam.start_time }} - {{ exam.end_time }}</div>
               <div class="mt-1 text-xs text-gray-500">时长：{{ exam.duration }} 分钟</div>
               <div class="mt-3">
-                <button class="h-9 px-3 rounded-lg bg-primary text-white text-xs">选择此考试并去签到</button>
+                <button class="h-9 px-3 rounded-lg bg-primary text-white text-xs">{{ exam.face_required ? '选择此考试并去签到' : '选择此考试并进入考试' }}</button>
               </div>
             </li>
           </ul>

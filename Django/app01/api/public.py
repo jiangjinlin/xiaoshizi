@@ -11,7 +11,7 @@ from django.db import transaction as dj_tx
 from django.conf import settings
 from ..models import User, ExamRecord, ExamQuestion, Question, Exam, AnswerRecord, OperationDetail
 from ..scoring import score_word, score_excel, score_ppt
-from .utils import fmt_dt, get_operation_template_url, norm_tf
+from .utils import fmt_dt, get_operation_template_url, norm_tf, is_face_required
 # 新增导入：评论、登录校验
 from .utils import require_login
 # 新增导入：题目评论与练习记录
@@ -538,11 +538,19 @@ def api_question_import(request):
 
 @api_view(["GET"])  # 已发布考试（选择用）
 def api_exam_select(request):
+    face_required = is_face_required()
     exams = Exam.objects.filter(is_published=True)
     exam_list = [
-        {'id': e.exam_id, 'title': e.title, 'start_time': fmt_dt(e.start_time), 'end_time': fmt_dt(e.end_time), 'duration': e.duration}
+        {
+            'id': e.exam_id,
+            'title': e.title,
+            'start_time': fmt_dt(e.start_time),
+            'end_time': fmt_dt(e.end_time),
+            'duration': e.duration,
+            'face_required': face_required,
+        }
         for e in exams]
-    return Response({'success': True, 'exams': exam_list})
+    return Response({'success': True, 'exams': exam_list, 'face_required': face_required})
 
 
 def calculate_score_and_full_score(exam, answers, files):
@@ -665,20 +673,21 @@ def api_submit_exam(request):
     if ExamRecord.objects.filter(exam=exam, user=user).exists():
         return Response({'success': False, 'error_msg': '该考试已提交，不能再次考试'})
 
-    from django.conf import settings
-    try:
-        ttl = int(getattr(settings, 'FACE_SIGNIN_TTL_MINUTES', 120) or 120)
-    except Exception:
-        ttl = 120
-    since = timezone.now() - timedelta(minutes=ttl)
-    try:
-        from ..models import ExamSignIn as _Sign
-    except Exception:
-        _Sign = None
-    if _Sign is not None:
-        ok = _Sign.objects.filter(exam=exam, user=user, success=True, created_at__gte=since).exists()
-        if not ok:
-            return Response({'success': False, 'error_msg': '未在人脸识别通过后参与本场考试或已过期，请先在本场考试签到'}, status=403)
+    if is_face_required():
+        from django.conf import settings
+        try:
+            ttl = int(getattr(settings, 'FACE_SIGNIN_TTL_MINUTES', 120) or 120)
+        except Exception:
+            ttl = 120
+        since = timezone.now() - timedelta(minutes=ttl)
+        try:
+            from ..models import ExamSignIn as _Sign
+        except Exception:
+            _Sign = None
+        if _Sign is not None:
+            ok = _Sign.objects.filter(exam=exam, user=user, success=True, created_at__gte=since).exists()
+            if not ok:
+                return Response({'success': False, 'error_msg': '未在人脸识别通过后参与本场考试或已过期，请先在本场考试签到'}, status=403)
 
     now = timezone.now()
     if not exam.is_published or exam.start_time > now or exam.end_time < now:
@@ -950,4 +959,5 @@ def api_q_comment_unlike(request):
     QuestionCommentLike.objects.filter(comment=c, user=user).delete()
     cnt = QuestionCommentLike.objects.filter(comment=c).count()
     return Response({'success': True, 'liked': False, 'likes': cnt})
+
 

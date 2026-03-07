@@ -803,13 +803,20 @@ def api_face_status(request):
         ttl = int(getattr(settings, 'FACE_SIGNIN_TTL_MINUTES', 120) or 120)
     except Exception:
         ttl = 120
+    try:
+        face_required = False
+        if GlobalSetting is not None:
+            row = GlobalSetting.objects.filter(key='FACE_REQUIRED').first()
+            face_required = bool(row and str(row.value).strip() in {'1','true','yes','on'})
+    except Exception:
+        face_required = False
     exam_id = request.query_params.get('exam_id') or request.query_params.get('examId')
     if not uid:
-        return Response({'success': True, 'signed_in': False, 'ttl_minutes': ttl})
+        return Response({'success': True, 'signed_in': False, 'ttl_minutes': ttl, 'face_required': face_required})
     try:
         user = User.objects.get(user_id=uid)
     except User.DoesNotExist:
-        return Response({'success': True, 'signed_in': False, 'ttl_minutes': ttl})
+        return Response({'success': True, 'signed_in': False, 'ttl_minutes': ttl, 'face_required': face_required})
 
     if not exam_id:
         ts = request.session.get('face_signin_at')
@@ -820,15 +827,15 @@ def api_face_status(request):
                 ok = timezone.now() - dt <= timedelta(minutes=ttl)
             except Exception:
                 ok = False
-        return Response({'success': True, 'signed_in': bool(ok), 'ttl_minutes': ttl})
+        return Response({'success': True, 'signed_in': bool(ok), 'ttl_minutes': ttl, 'face_required': face_required})
 
     try:
         exam = Exam.objects.get(exam_id=int(exam_id))
     except Exception:
-        return Response({'success': True, 'signed_in': False, 'ttl_minutes': ttl})
+        return Response({'success': True, 'signed_in': False, 'ttl_minutes': ttl, 'face_required': face_required})
     since = timezone.now() - timedelta(minutes=ttl)
     ok = ExamSignIn.objects.filter(exam=exam, user=user, success=True, created_at__gte=since).exists()
-    return Response({'success': True, 'signed_in': bool(ok), 'ttl_minutes': ttl})
+    return Response({'success': True, 'signed_in': bool(ok), 'ttl_minutes': ttl, 'face_required': face_required})
 
 try:
     api_face_status.throttle_scope = 'face'
