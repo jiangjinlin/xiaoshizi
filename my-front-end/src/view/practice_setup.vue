@@ -113,6 +113,17 @@ const syllabusLabel = computed(()=>{
   return s.province + (s.major? ' / ' + s.major : '')
 })
 
+const currentFiltersReadable = computed(() => {
+  const seg = []
+  if (form.types?.length) seg.push('题型:' + form.types.join(','))
+  if (form.score_min !== '' && form.score_min !== null && form.score_min !== undefined) seg.push('最低分:' + form.score_min)
+  if (form.score_max !== '' && form.score_max !== null && form.score_max !== undefined) seg.push('最高分:' + form.score_max)
+  seg.push('数量:' + form.limit)
+  if (form.shuffle) seg.push('乱序')
+  if (s.province) seg.push('考纲:' + syllabusLabel.value)
+  return seg.join(' / ')
+})
+
 // 本地记忆
 const LAST_KEY = 'practice_last_filters'
 const hasLast = computed(() => !!localStorage.getItem(LAST_KEY))
@@ -158,8 +169,12 @@ async function loadOptions(){
       options.batches = data.batches || []
       options.counts_by_type = data.counts_by_type || {}
       options.score_range = data.score_range || {min:0,max:0}
+      return
     }
-  } catch{}
+    errorMsg.value = data?.error_msg || '加载题型失败'
+  } catch(e){
+    errorMsg.value = e?._friendly || '加载题型失败'
+  }
 }
 
 watch(()=>[s.province, s.major], ()=> loadOptions(), { deep: true })
@@ -189,17 +204,22 @@ async function generate(){
     const { data } = await apiPracticeQuestions(params)
     if(data?.success){
       const list = data.questions || []
-      if(!list.length){ errorMsg.value='没有得到题目，请调整筛选条件'; return }
+      if(!list.length){
+        sessionStorage.removeItem('practice_questions')
+        sessionStorage.removeItem('practice_filters')
+        errorMsg.value = data?.message || `没有得到题目，请调整筛选条件${currentFiltersReadable.value ? '（当前：' + currentFiltersReadable.value + '）' : ''}`
+        return
+      }
       sessionStorage.setItem('practice_questions', JSON.stringify(list))
       sessionStorage.setItem('practice_filters', JSON.stringify({...form}))
       localStorage.setItem(LAST_KEY, JSON.stringify({...form}))
-      successMsg.value='生成成功，正在进入答题…'
+      successMsg.value = `生成成功，共 ${list.length} 题，正在进入答题…`
       setTimeout(()=> router.push('/practice/do'), 300)
     } else {
       errorMsg.value = data?.error_msg || '生成失败'
     }
   } catch(e){
-    errorMsg.value = '网络错误，生成失败'
+    errorMsg.value = e?._friendly || '网络错误，生成失败'
   } finally {
     loading.value=false
   }

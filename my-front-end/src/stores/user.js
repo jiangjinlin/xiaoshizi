@@ -37,10 +37,12 @@ export const useUserStore = defineStore('user', {
           this.role = p.role || ''
           this.avatarUrl = bustUrl(p.avatar_url)
           this.profileLoaded = true
+          return true
         }
       } catch (e) {
-        // 忽略未登录或网络错误
+        this.clear()
       }
+      return false
     },
     setAvatarUrl(url) {
       this.avatarUrl = bustUrl(url, Date.now())
@@ -54,4 +56,3 @@ export const useUserStore = defineStore('user', {
     }
   }
 })
-

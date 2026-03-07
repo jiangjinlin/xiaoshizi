@@ -24,6 +24,7 @@
           <div class="flex flex-wrap gap-3">
             <button class="h-10 px-4 rounded-lg bg-white/70 border border-gray-300 text-gray-700 text-xs font-medium hover:bg-white transition" @click="clearCurrent">清空当前</button>
             <button class="h-10 px-4 rounded-lg bg-primary text-white text-xs font-medium shadow-sm hover:bg-primary/90 transition" @click="submitCurrent" :disabled="submitting || !currentQuestion">{{ submitting ? '判题中...' : '提交当前' }}</button>
+            <button class="h-10 px-4 rounded-lg bg-indigo-600 text-white text-xs font-medium shadow-sm hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed" @click="submitAll" :disabled="submitting || !canSubmitAny">{{ submittingAll ? '批量提交中...' : '一键全交' }}</button>
             <button class="h-10 px-4 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium border border-gray-300 hover:bg-gray-200 transition" @click="prev" :disabled="!hasPrev">上一题</button>
             <button class="h-10 px-4 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium border border-gray-300 hover:bg-gray-200 transition" @click="next" :disabled="!hasNext">下一题</button>
             <button class="h-10 px-4 rounded-lg bg-white/70 text-gray-700 text-xs font-medium border border-gray-300 hover:bg-white transition" @click="skip" :disabled="!hasNext">跳过</button>
@@ -31,7 +32,10 @@
           </div>
         </div>
 
-        <div v-if="!questions.length && !loading" class="p-16 text-center text-gray-400 text-sm">暂无题目，请重新选择条件。</div>
+        <div v-if="!questions.length && !loading" class="p-16 text-center text-gray-400 text-sm">
+          <div>暂无题目，请重新选择条件。</div>
+          <div v-if="filtersInfo" class="mt-2 text-xs text-gray-500">当前条件：{{ filtersInfo }}</div>
+        </div>
         <div v-if="loading" class="p-16 text-center text-gray-500 text-sm">加载中...</div>
 
         <div v-else class="p-6">
@@ -96,14 +100,14 @@
                 <div v-else-if="currentQuestion.type==='多选'" class="space-y-1">
                   <template v-if="!hasInlineChoices(currentQuestion.content)">
                     <label v-for="opt in currentQuestion.options" :key="opt.key" class="flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-primary/5 cursor-pointer text-sm">
-                      <input type="checkbox" :value="opt.key" v-model="answersMulti[currentQuestion.id]" class="mt-0.5" />
+                      <input type="checkbox" :value="opt.key" :checked="isMultiSelected(currentQuestion.id, opt.key)" @change="toggleMultiAnswer(currentQuestion.id, opt.key, $event.target.checked)" class="mt-0.5" />
                       <span class="flex-1 break-words">{{ formatLabel(opt.label) }}</span>
                     </label>
                   </template>
                   <template v-else>
                     <div class="flex flex-wrap gap-2">
                       <label v-for="k in ['A','B','C','D']" :key="k" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white/70 hover:bg-primary/5 cursor-pointer text-sm">
-                        <input type="checkbox" :value="k" v-model="answersMulti[currentQuestion.id]" />
+                        <input type="checkbox" :value="k" :checked="isMultiSelected(currentQuestion.id, k)" @change="toggleMultiAnswer(currentQuestion.id, k, $event.target.checked)" />
                         <span class="font-mono">{{ k }}</span>
                       </label>
                     </div>
@@ -196,6 +200,7 @@ import AppLogo from '../components/AppLogo.vue'
 const router = useRouter()
 const loading = ref(true)
 const submitting = ref(false)
+const submittingAll = ref(false)
 const questions = ref([])
 const rawFilters = ref(null)
 
@@ -223,7 +228,9 @@ const filtersInfo = computed(() => {
   if (!rawFilters.value) return ''
   const f = rawFilters.value
   const parts = []
-  if (f.type) parts.push('题型: ' + f.type)
+  const types = Array.isArray(f.types) ? f.types.filter(Boolean) : []
+  if (types.length) parts.push('题型: ' + types.join('、'))
+  else if (f.type) parts.push('题型: ' + f.type)
   if (f.batch) parts.push('批次: ' + f.batch)
   parts.push('数量: ' + f.limit)
   if (f.shuffle) parts.push('乱序')
@@ -244,53 +251,26 @@ function restoreQuestions() {
     currentIndex.value = 0
   } catch {
     questions.value = []
+    rawFilters.value = null
+    router.replace('/practice/setup')
   } finally {
     loading.value = false
   }
 }
 
-function clearCurrent(){
-  const q = currentQuestion.value
-  if (!q) return
-  delete answers[q.id]
-  delete answersMulti[q.id]
-}
-
-function prev(){ if (hasPrev.value) currentIndex.value -= 1 }
-function next(){ if (hasNext.value) currentIndex.value += 1 }
-function skip(){ next() }
-
-async function submitCurrent(){
-  const q = currentQuestion.value
-  if (!q || submitting.value) return
-  submitting.value = true
+function scrollToTop() {
   try {
-    const payload = { answers: {}, question_ids: [q.id] }
-    if (q.type === '多选') payload.answers[q.id] = (answersMulti[q.id] || []).slice()
-    else if (q.type === '判断' || q.type === '单选') payload.answers[q.id] = answers[q.id] || ''
-    const { data } = await apiPracticeCheck(payload)
-    if (data?.success && Array.isArray(data.details)){
-      const detail = data.details.find(d => d.id === q.id) || null
-      if (detail){
-        const idx = resultDetails.value.findIndex(d => d.id === q.id)
-        if (idx >= 0) resultDetails.value.splice(idx, 1, detail)
-        else resultDetails.value.push(detail)
-        // 提交后刷新评论
-        await loadQComments()
-        if (detail.is_correct && hasNext.value) currentIndex.value += 1
-      }
-    }
-  } finally {
-    submitting.value = false
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  } catch {
+    window.scrollTo(0, 0)
   }
 }
 
-function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
 function backToSetup() { router.push('/practice/setup') }
 function backPrev(){ router.push('/student') }
 
 function hasInlineChoices(text){
-  const t = String(text||'')
+  const t = String(text || '')
   return /(^|[\n\r])\s*[A-D]\s*[。.、．:：]/.test(t)
 }
 
@@ -304,7 +284,7 @@ const answeredCount = computed(() => {
   let c = 0
   for (const q of questions.value){
     const a = answers[q.id]
-    const m = answersMulti[q.id]
+    const m = getMultiAnswers(q.id)
     if ((Array.isArray(m) && m.length) || (a !== undefined && a !== null && String(a).length)) c++
   }
   return c
@@ -320,7 +300,7 @@ function isAnswered(idx){
   const q = questions.value[idx]
   if (!q) return false
   const a = answers[q.id]
-  const m = answersMulti[q.id]
+  const m = getMultiAnswers(q.id)
   return (Array.isArray(m) && m.length) || (a !== undefined && a !== null && String(a).length)
 }
 function isCorrect(idx){
@@ -341,9 +321,121 @@ function cardClass(idx){
   return 'bg-white/70 text-gray-700 border-gray-300 hover:bg-white'
 }
 function jumpTo(idx){
-  if (idx >=0 && idx < questions.value.length){
+  if (idx >= 0 && idx < questions.value.length){
     currentIndex.value = idx
     scrollToTop()
+  }
+}
+
+function clearCurrent(){
+  const q = currentQuestion.value
+  if (!q) return
+  delete answers[q.id]
+  answersMulti[q.id] = []
+}
+
+function getMultiAnswers(questionId){
+  const current = answersMulti[questionId]
+  if (Array.isArray(current)) return current
+  const normalized = current == null ? [] : [String(current)]
+  answersMulti[questionId] = normalized
+  return normalized
+}
+
+function isMultiSelected(questionId, optionKey){
+  return getMultiAnswers(questionId).includes(optionKey)
+}
+
+function toggleMultiAnswer(questionId, optionKey, checked){
+  const next = [...getMultiAnswers(questionId)]
+  const idx = next.indexOf(optionKey)
+  if (checked && idx < 0) next.push(optionKey)
+  if (!checked && idx >= 0) next.splice(idx, 1)
+  answersMulti[questionId] = next
+}
+
+function buildSubmissionPayload(questionList = questions.value){
+  const payload = { answers: {}, question_ids: [] }
+  for (const q of questionList){
+    if (!q || q.type === '操作') continue
+    if (q.type === '多选') {
+      const selected = getMultiAnswers(q.id).filter(Boolean)
+      if (!selected.length) continue
+      payload.answers[q.id] = [...selected]
+      payload.question_ids.push(q.id)
+      continue
+    }
+    const value = answers[q.id]
+    if (value === undefined || value === null || String(value).trim() === '') continue
+    payload.answers[q.id] = value
+    payload.question_ids.push(q.id)
+  }
+  return payload
+}
+
+function mergeResultDetails(details = []){
+  for (const detail of details){
+    if (!detail?.id) continue
+    const idx = resultDetails.value.findIndex(d => d.id === detail.id)
+    if (idx >= 0) resultDetails.value.splice(idx, 1, detail)
+    else resultDetails.value.push(detail)
+  }
+}
+
+const canSubmitAny = computed(() => buildSubmissionPayload().question_ids.length > 0)
+
+function prev(){ if (hasPrev.value) currentIndex.value -= 1 }
+function next(){ if (hasNext.value) currentIndex.value += 1 }
+function skip(){ next() }
+
+async function submitCurrent(){
+  const q = currentQuestion.value
+  if (!q || submitting.value || submittingAll.value) return
+  submitting.value = true
+  try {
+    const payload = buildSubmissionPayload([q])
+    if (!payload.question_ids.length) {
+      alert('请先作答当前题再提交')
+      return
+    }
+    const { data } = await apiPracticeCheck(payload)
+    if (data?.success && Array.isArray(data.details)){
+      const detail = data.details.find(d => d.id === q.id) || null
+      if (detail){
+        mergeResultDetails([detail])
+        await loadQComments()
+        if (detail.is_correct && hasNext.value) currentIndex.value += 1
+      }
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function submitAll(){
+  if (submitting.value || submittingAll.value) return
+  const payload = buildSubmissionPayload()
+  if (!payload.question_ids.length) {
+    alert('请先至少完成一题再一键提交')
+    return
+  }
+  submittingAll.value = true
+  try {
+    const { data } = await apiPracticeCheck(payload)
+    if (data?.success && Array.isArray(data.details)) {
+      mergeResultDetails(data.details)
+      await loadQComments()
+      const firstWrongIndex = questions.value.findIndex(q => q && resultById.value[q.id] && resultById.value[q.id].is_correct === false)
+      if (firstWrongIndex >= 0) currentIndex.value = firstWrongIndex
+      else {
+        const firstUnjudgedIndex = questions.value.findIndex(q => q && q.type !== '操作' && !resultById.value[q.id])
+        if (firstUnjudgedIndex >= 0) currentIndex.value = firstUnjudgedIndex
+      }
+      scrollToTop()
+      alert(`已提交 ${data.details.length} 题`)
+    }
+  } finally {
+    submittingAll.value = false
   }
 }
 

@@ -1,5 +1,6 @@
 import random
-from django.db import transaction
+import json
+import re
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from ..models import Question, PracticeAnswer
@@ -212,6 +213,88 @@ def api_practice_questions(request):
     return Response({'success': True, 'questions': out})
 
 
+def _normalize_question_ids(raw_ids, amap):
+    ids = []
+    seen = set()
+    candidates = []
+    if isinstance(raw_ids, str):
+        try:
+            parsed = json.loads(raw_ids)
+            if isinstance(parsed, list):
+                candidates = parsed
+            else:
+                candidates = [raw_ids]
+        except Exception:
+            candidates = re.findall(r'\d+', raw_ids)
+    elif isinstance(raw_ids, (list, tuple, set)):
+        candidates = list(raw_ids)
+    elif raw_ids not in (None, ''):
+        candidates = [raw_ids]
+    for item in candidates:
+        try:
+            qid = int(str(item).strip())
+        except Exception:
+            continue
+        if qid not in seen:
+            ids.append(qid)
+            seen.add(qid)
+    if ids:
+        return ids
+    for key in amap.keys():
+        try:
+            qid = int(str(key).strip())
+        except Exception:
+            continue
+        if qid not in seen:
+            ids.append(qid)
+            seen.add(qid)
+    return ids
+
+
+def _normalize_multi_answer(value):
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = re.findall(r'[A-D]', str(value or '').upper())
+    picked = []
+    seen = set()
+    for item in raw_items:
+        letter = str(item).strip().upper()
+        if letter not in {'A', 'B', 'C', 'D'} or letter in seen:
+            continue
+        seen.add(letter)
+        picked.append(letter)
+    picked.sort()
+    return picked
+
+
+def _normalize_judge_answer(value):
+    s = str(value or '').strip().lower()
+    true_alias = {'a','t','true','yes','y','1','对','正确','是'}
+    false_alias = {'b','f','false','no','n','0','错','错误','否'}
+    if s in true_alias:
+        return 'A'
+    if s in false_alias:
+        return 'B'
+    return ''
+
+
+def _normalize_user_answer(question_type, value):
+    if question_type == '多选':
+        return _normalize_multi_answer(value)
+    if question_type == '判断':
+        return _normalize_judge_answer(value)
+    return str(value or '').strip().upper()
+
+
+def _normalize_correct_answer(question_type, value):
+    if question_type == '多选':
+        return _normalize_multi_answer(value)
+    if question_type == '判断':
+        return _normalize_judge_answer(value)
+    return str(value or '').strip().upper()
+
+
 @api_view(["POST"])  # 判题并写入练习统计
 def api_practice_check(request):
     user, err = require_login(request, roles=['学生','VIP'])
@@ -221,7 +304,6 @@ def api_practice_check(request):
     answers = request.data.get('answers')
     if isinstance(answers, str):
         try:
-            import json
             answers = json.loads(answers)
         except Exception:
             answers = None
@@ -234,41 +316,30 @@ def api_practice_check(request):
             qid = str(k).replace('answer_', '')
             amap[qid] = v
 
-    try:
-        ids = [int(k) for k in amap.keys() if str(k).isdigit()]
-    except Exception:
-        ids = []
-    qs_map = {q.question_id: q for q in Question.objects.filter(question_id__in=ids)} if ids else {}
+    requested_ids = _normalize_question_ids(request.data.get('question_ids'), amap)
+    qs_map = {q.question_id: q for q in Question.objects.filter(question_id__in=requested_ids)} if requested_ids else {}
 
     details = []
     correct = 0
     total = 0
-    for qid_str, ua in amap.items():
-        try:
-            qid = int(qid_str)
-        except Exception:
-            continue
+    invalid_question_ids = []
+    for qid in requested_ids:
         q = qs_map.get(qid)
         if not q or q.question_type not in ('单选', '多选', '判断'):
+            invalid_question_ids.append(qid)
+            continue
+        qid_str = str(qid)
+        if qid_str not in amap:
+            continue
+        ua_raw = amap.get(qid_str)
+        user_answer = _normalize_user_answer(q.question_type, ua_raw)
+        if q.question_type == '多选' and not user_answer:
+            continue
+        if q.question_type in ('单选', '判断') and not str(user_answer).strip():
             continue
         total += 1
-        ca = str(q.answer or '')
-        ok = False
-        if q.question_type == '单选':
-            ok = str(ua).strip().upper() == ca.strip().upper()
-        elif q.question_type == '多选':
-            if isinstance(ua, list):
-                uset = set([str(x).strip().upper() for x in ua if str(x).strip()])
-            else:
-                import re as _re
-                letters = _re.findall(r'[A-D]', str(ua).upper())
-                uset = set([x.strip().upper() for x in letters])
-            import re as _re2
-            cset = set([x for x in _re2.findall(r'[A-D]', ca.upper())])
-            ok = (uset == cset)
-        else:
-            s = str(ua).strip().lower()
-            ok = s in {'a','t','true','yes','y','1','对','正确','是'} if ca.strip().lower() in {'a','t','true','yes','y','1','对','正确','是'} else s in {'b','f','false','no','n','0','错','错误','否'}
+        correct_answer = _normalize_correct_answer(q.question_type, q.answer)
+        ok = user_answer == correct_answer
         if ok:
             correct += 1
         details.append({
@@ -276,14 +347,13 @@ def api_practice_check(request):
             'question_id': qid,
             'type': q.question_type,
             'content': q.content,
-            'user_answer': ua,
-            'correct_answer': ca,
+            'user_answer': user_answer,
+            'correct_answer': ''.join(correct_answer) if isinstance(correct_answer, list) else correct_answer,
             'is_correct': bool(ok),
             'analysis': q.analysis or '',
             'knowledge_points': q.knowledge_points or '',
             'primary_knowledge': q.primary_knowledge or ''
         })
-        # 更新练习统计
         if uid:
             pa, _ = PracticeAnswer.objects.get_or_create(user_id=uid, question_id=qid, defaults={'total_attempts':0,'correct_attempts':0,'last_is_correct':False})
             pa.total_attempts += 1
@@ -293,7 +363,15 @@ def api_practice_check(request):
             pa.save()
 
     accuracy = round(100.0 * correct / total, 0) if total else 0
-    return Response({'success': True, 'correct': correct, 'total': total, 'accuracy': accuracy, 'details': details})
+    return Response({
+        'success': True,
+        'correct': correct,
+        'total': total,
+        'accuracy': accuracy,
+        'details': details,
+        'invalid_question_ids': invalid_question_ids,
+        'submitted_question_ids': [d['id'] for d in details]
+    })
 
 
 @api_view(["GET"])  # 练习统计（题型正确率与错题数）

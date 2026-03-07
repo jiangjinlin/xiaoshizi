@@ -41,10 +41,12 @@ async function handleLogin() {
   } catch (e) {
     if (e.response) {
       const s = e.response.status
-      if (s === 405) errorMsg.value = '请求方式不正确（应为 POST）'
-      else if (s === 401) errorMsg.value = '未登录或登录已过期'
-      else if (s === 500) errorMsg.value = '服务器内部错误，请稍后重试'
-      else errorMsg.value = e.response.data?.detail || '请求失败，状态码：' + s
+      const backendMsg = e.response.data?.error_msg || e.response.data?.detail
+      if (s === 405) errorMsg.value = backendMsg || '请求方式不正确（应为 POST）'
+      else if (s === 400) errorMsg.value = backendMsg || '用户名或密码错误'
+      else if (s === 401) errorMsg.value = backendMsg || '未登录或登录已过期'
+      else if (s === 500) errorMsg.value = backendMsg || '服务器内部错误，请稍后重试'
+      else errorMsg.value = backendMsg || ('请求失败，状态码：' + s)
     } else if (e.request) {
       errorMsg.value = '无法连接服务器，请检查网络'
     } else {

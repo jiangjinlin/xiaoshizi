@@ -15,11 +15,12 @@ useUiStore().initTheme()
 app.use(router)
 app.mount('#app')
 
-// 自动登出：页面/标签关闭时，如果这是最后一个标签，则调用后端 /api/logout
+// 自动登出：仅在最后一个标签真实关闭时再请求后端登出，避免刷新页面误触发退出
 ;(function setupAutoLogoutOnClose(){
   const TAB_KEY = 'open_tabs'
   const tabId = Math.random().toString(36).slice(2)
   let logoutSent = false
+  let reloadLikely = false
 
   function readTabs(){
     try { return JSON.parse(localStorage.getItem(TAB_KEY) || '[]') } catch { return [] }
@@ -40,7 +41,7 @@ app.mount('#app')
     try { return (getLanConfig().baseURL || '').replace(/\/$/, '') } catch { return '' }
   }
   function sendLogout(){
-    if (logoutSent) return
+    if (logoutSent || reloadLikely) return
     logoutSent = true
     const url = apiBase() + '/api/logout'
     try {
@@ -57,21 +58,50 @@ app.mount('#app')
     } catch {}
   }
 
-  // 注册本标签页
   addTab()
 
-  // 在可见性切换为隐藏或页面卸载时尝试登出（若仅剩当前标签）
+  function markReloadLikely(){
+    reloadLikely = true
+    try { sessionStorage.setItem('page_reload_in_progress', '1') } catch {}
+  }
+
+  function clearReloadFlagSoon(){
+    window.setTimeout(() => {
+      reloadLikely = false
+      try { sessionStorage.removeItem('page_reload_in_progress') } catch {}
+    }, 1500)
+  }
+
   function handleCloseAttempt(){
     try {
       const remain = removeTab()
       if (remain === 0) sendLogout()
     } catch {}
   }
-  window.addEventListener('pagehide', handleCloseAttempt)
-  window.addEventListener('beforeunload', handleCloseAttempt)
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') handleCloseAttempt()
+
+  window.addEventListener('keydown', (e) => {
+    const key = String(e.key || '').toLowerCase()
+    if (key === 'f5' || ((e.ctrlKey || e.metaKey) && key === 'r')) markReloadLikely()
   })
+  window.addEventListener('beforeunload', () => {
+    markReloadLikely()
+    window.setTimeout(() => {
+      if (!reloadLikely) return
+      addTab()
+    }, 0)
+  })
+  window.addEventListener('pagehide', (e) => {
+    if (e.persisted || reloadLikely) return
+    handleCloseAttempt()
+  })
+
+  // 首屏恢复时，若是刷新，补回当前标签记录
+  try {
+    if (sessionStorage.getItem('page_reload_in_progress') === '1') {
+      addTab()
+      clearReloadFlagSoon()
+    }
+  } catch {}
 
   // 兼容：其他标签变动时，清理已不存在的重复项
   window.addEventListener('storage', (e) => {
