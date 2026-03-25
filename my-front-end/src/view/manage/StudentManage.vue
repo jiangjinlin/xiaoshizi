@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
-import { apiManageStudentList, apiManageStudentSave, apiManageStudentDelete, apiManageStudentsBatchDegradeVip } from '../../api/index'
+import { apiManageStudentList, apiManageStudentSave, apiManageStudentDelete, apiManageStudentsBatchDegradeVip, apiManageFaceReset } from '../../api/index'
 import { useRoute, useRouter } from 'vue-router'
 
 const loading = ref(false)
@@ -121,6 +121,23 @@ async function onDelete(id) {
     if (data?.success) fetchList()
     else alert(data?.error_msg || '删除失败')
   } catch { alert('网络错误，删除失败') }
+}
+
+async function onResetFace(u) {
+  if (!isAdmin.value) { alert('无权限，仅管理员可操作'); return }
+  if (!u?.user_id) return
+  if (!confirm(`确定重置用户 ${u.username} 的人脸信息吗？重置后需重新录入。`)) return
+  try {
+    const { data } = await apiManageFaceReset({ user_id: u.user_id })
+    if (data?.success) {
+      alert(data?.message || '人脸信息已重置')
+      fetchList()
+    } else {
+      alert(data?.error_msg || '重置失败')
+    }
+  } catch {
+    alert('网络错误，重置失败')
+  }
 }
 
 // 徽章样式函数
@@ -294,6 +311,7 @@ watch(pageSize, () => { page.value = 1; fetchList() })
                 <template v-if="isAdmin">
                   <button class="text-blue-600" @click="openEdit(u)"><i class="fas fa-edit"></i> 编辑</button>
                   <button class="text-red-600" @click="onDelete(u.user_id)"><i class="fas fa-trash"></i> 删除</button>
+                  <button class="text-orange-600" @click="onResetFace(u)"><i class="fas fa-face-smile"></i> 重置人脸</button>
                   <button v-if="u.role!=='VIP'" :disabled="upgrading" class="text-emerald-600 disabled:opacity-40" @click="upgradeToVip(u)"><i class="fas fa-level-up-alt"></i> 升级VIP</button>
                 </template>
                 <template v-else>

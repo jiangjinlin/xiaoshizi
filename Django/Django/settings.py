@@ -246,11 +246,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ================== 百度AI人脸识别配置 ==================
 # 最小改动：仍使用硬编码，生产可改为：os.getenv('BAIDU_FACE_APP_ID') 等（保持当前行为不破坏）
 BAIDU_FACE = {
-    'APP_ID': os.getenv('BAIDU_FACE_APP_ID', 'IL2AOntFfPt2Bi169zbwOmv2'),
+    'APP_ID': os.getenv('BAIDU_FACE_APP_ID', '119819856'),
     'API_KEY': os.getenv('BAIDU_FACE_API_KEY', 'IL2AOntFfPt2Bi169zbwOmv2'),
     'SECRET_KEY': os.getenv('BAIDU_FACE_SECRET_KEY', 'EO5LenhwhV6zEz8lY35XkK1QKAfbHvgu'),
     'GROUP_ID': os.getenv('BAIDU_FACE_GROUP_ID', 'exam_users'),
-    'THRESHOLD': float(os.getenv('BAIDU_FACE_THRESHOLD', '80.0')),
+    'THRESHOLD': float(os.getenv('BAIDU_FACE_THRESHOLD', '60.0')),
 }
 FACE_SIGNIN_TTL_MINUTES = int(os.getenv('FACE_SIGNIN_TTL_MINUTES', '120'))
 LOCAL_FACE = { 'THRESHOLD': float(os.getenv('LOCAL_FACE_THRESHOLD', '85.0')) }

@@ -46,6 +46,7 @@ from .face import (
     api_face_profile,                 # 新增：用户人脸档案状态
     api_manage_face_setting,          # 新增：全局人脸开关获取
     api_manage_face_setting_save,     # 新增：全局人脸开关设置
+    api_manage_face_reset,            # 新增：管理员重置用户人脸
 )
 from .manage import (
     api_manage_batch_list,

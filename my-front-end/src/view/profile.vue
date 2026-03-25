@@ -39,6 +39,7 @@ const vipExpiresAt = ref(null)
 const faceExpiresAt = ref(null)
 const faceExpired = ref(false)
 const faceDaysLeft = ref(null)
+const faceBound = ref(false)
 
 async function loadProfile() {
   loading.value = true
@@ -65,6 +66,7 @@ async function loadProfile() {
   try {
     const { data } = await apiFaceProfile()
     if (data?.success) {
+      faceBound.value = !!data.has_face
       if(data.expires_at && !faceExpiresAt.value) faceExpiresAt.value = data.expires_at
       if(typeof data.days_left === 'number') faceDaysLeft.value = data.days_left
       if(data.expired) faceExpired.value = true
@@ -129,7 +131,7 @@ const faceMsg = ref('')
 const faceLoading = ref(false)
 const faceItems = ref([])
 const faceElig = ref({ loading: true, eligible: false, reason: '', rank: null })
-const hasApproved = computed(() => faceItems.value.some(it => it.status === 'approved'))
+const hasApproved = computed(() => faceBound.value)
 const canSubmitFace = computed(() => {
   // 过期后允许重新提交（即使曾经 approved），需要同时满足资格
   if(faceExpired.value) return faceElig.value.eligible && !faceLoading.value
@@ -202,6 +204,7 @@ async function submitFace(){
         const prof = await apiFaceProfile()
         const d = prof?.data
         if (d?.success){
+          faceBound.value = !!d.has_face
           faceExpiresAt.value = d.expires_at || null
           faceDaysLeft.value = typeof d.days_left==='number' ? d.days_left : null
           faceExpired.value = !!d.expired

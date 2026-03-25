@@ -133,6 +133,64 @@ def _ensure_group(client, group_id: str):
     return True
 
 
+def _cloud_user_id(user: User) -> str:
+    """Use a stable ASCII ID for cloud face APIs to avoid non-ASCII username issues."""
+    try:
+        return f"u{int(user.user_id)}"
+    except Exception:
+        return f"u{str(getattr(user, 'user_id', '') or '').strip()}"
+
+
+def _cloud_candidate_ids(user: User) -> list[str]:
+    """Keep backward compatibility with existing cloud records keyed by username."""
+    vals = []
+    try:
+        vals.append(_cloud_user_id(user))
+    except Exception:
+        pass
+    try:
+        uname = str(getattr(user, 'username', '') or '').strip()
+        if uname:
+            vals.append(uname)
+    except Exception:
+        pass
+    # keep order and deduplicate
+    out = []
+    for v in vals:
+        if v and v not in out:
+            out.append(v)
+    return out
+
+
+def _cloud_upsert_face(user: User, raw: bytes) -> tuple[bool, str]:
+    """Write/update one user's face to Baidu cloud using stable ASCII user_id."""
+    conf = getattr(settings, 'BAIDU_FACE', {}) or {}
+    if not (conf.get('APP_ID') and conf.get('API_KEY') and conf.get('SECRET_KEY')):
+        return False, '人脸识别未配置'
+    client, err = _get_face_client()
+    if err:
+        return False, err
+    group_id = conf.get('GROUP_ID', 'exam_users')
+    _ensure_group(client, group_id)
+    cloud_uid = _cloud_user_id(user)
+    options = {'user_info': user.username, 'quality_control': 'LOW', 'liveness_control': 'NONE'}
+    img_b64 = base64.b64encode(raw).decode('ascii')
+    try:
+        # Prefer update for existing users; fallback to add for first enrollment.
+        resp = client.updateUser(img_b64, 'BASE64', group_id, cloud_uid, options)
+        if isinstance(resp, dict) and int(resp.get('error_code') or -1) == 0:
+            return True, f'百度入库成功({cloud_uid})'
+    except Exception:
+        pass
+    try:
+        resp = client.addUser(img_b64, 'BASE64', group_id, cloud_uid, options)
+        if isinstance(resp, dict) and int(resp.get('error_code') or -1) == 0:
+            return True, f'百度入库成功({cloud_uid})'
+    except Exception:
+        pass
+    return False, '百度入库失败'
+
+
 def _media_join(*parts):
     try:
         base = settings.MEDIA_ROOT
@@ -339,23 +397,7 @@ def api_face_register(request):
     cloud_msg = ''
     conf = getattr(settings, 'BAIDU_FACE', {})
     if conf and conf.get('APP_ID') and conf.get('API_KEY') and conf.get('SECRET_KEY'):
-        client, err_c = _get_face_client()
-        if not err_c:
-            group_id = conf.get('GROUP_ID', 'exam_users')
-            _ensure_group(client, group_id)
-            try:
-                options = {'user_info': user.username, 'quality_control': 'LOW', 'liveness_control': 'NONE'}
-                img_b64 = base64.b64encode(raw).decode('ascii')
-                resp = client.addUser(img_b64, 'BASE64', group_id, user.username, options)
-                if isinstance(resp, dict) and resp.get('error_code') == 0:
-                    cloud_ok = True
-                    cloud_msg = '百度入库成功'
-                else:
-                    cloud_msg = '百度入库失败'
-            except Exception:
-                cloud_msg = '百度调用异常'
-        else:
-            cloud_msg = err_c
+        cloud_ok, cloud_msg = _cloud_upsert_face(user, raw)
 
     if local_ok or cloud_ok:
         msg = (local_msg or '') + (('；' + cloud_msg) if cloud_msg else '')
@@ -396,6 +438,8 @@ def api_face_supplement_submit(request):
 
     # VIP: 直接入库并生成“已批准”记录，免审核
     if user.role == 'VIP':
+        cloud_ok = False
+        cloud_msg = ''
         try:
             bits = _image_ahash_from_bytes(raw)
             # 保存到 FaceProfile
@@ -408,6 +452,12 @@ def api_face_supplement_submit(request):
             fp.save()
         except Exception:
             return Response({'success': False, 'error_msg': '更新人脸库失败'}, status=500)
+
+        # 同步云端，避免“补充通过但云端无数据”
+        cloud_conf = getattr(settings, 'BAIDU_FACE', {}) or {}
+        if cloud_conf.get('APP_ID') and cloud_conf.get('API_KEY') and cloud_conf.get('SECRET_KEY'):
+            cloud_ok, cloud_msg = _cloud_upsert_face(user, raw)
+
         # 生成 faces_pending 目录下的“已批准”记录，便于前端显示与后台查看
         pending_dir = _media_join('faces_pending')
         _ensure_dir(pending_dir)
@@ -438,7 +488,10 @@ def api_face_supplement_submit(request):
         except Exception:
             # 元数据生成失败不影响绑定结果
             pass
-        return Response({'success': True, 'id': sid, 'status': 'approved', 'message': 'VIP 已直接绑定，无需审核'})
+        msg = 'VIP 已直接绑定，无需审核'
+        if cloud_msg:
+            msg = f'{msg}；{cloud_msg}'
+        return Response({'success': True, 'id': sid, 'status': 'approved', 'cloud_ok': cloud_ok, 'message': msg})
 
     # 非 VIP（学生）：按原逻辑进入待审核
     pending_dir = _media_join('faces_pending')
@@ -611,6 +664,12 @@ def api_manage_face_supplement_approve(request):
     except Exception:
         return Response({'success': False, 'error_msg': '更新人脸库失败'})
 
+    cloud_ok = False
+    cloud_msg = ''
+    cloud_conf = getattr(settings, 'BAIDU_FACE', {}) or {}
+    if cloud_conf.get('APP_ID') and cloud_conf.get('API_KEY') and cloud_conf.get('SECRET_KEY'):
+        cloud_ok, cloud_msg = _cloud_upsert_face(u, raw)
+
     try:
         import json
         meta['status'] = 'approved'
@@ -621,7 +680,7 @@ def api_manage_face_supplement_approve(request):
     except Exception:
         pass
 
-    return Response({'success': True})
+    return Response({'success': True, 'cloud_ok': cloud_ok, 'message': cloud_msg or '审核通过'})
 
 try:
     api_manage_face_supplement_approve.throttle_scope = 'face'
@@ -729,6 +788,7 @@ def api_face_signin(request):
             client, err = _get_face_client()
             if not err:
                 group_id = conf.get('GROUP_ID', 'exam_users')
+                candidate_ids = set(_cloud_candidate_ids(user))
                 try:
                     threshold = float(conf.get('THRESHOLD', 80.0) or 80.0)
                 except Exception:
@@ -741,7 +801,7 @@ def api_face_signin(request):
                         user_list = (resp.get('result') or {}).get('user_list') or []
                         match_item = None
                         for it in user_list:
-                            if str(it.get('user_id') or '') == user.username:
+                            if str(it.get('user_id') or '') in candidate_ids:
                                 match_item = it
                                 break
                         if not match_item and user_list:
@@ -749,7 +809,7 @@ def api_face_signin(request):
                         if match_item:
                             score_v = float(match_item.get('score') or 0)
                             uid_match = str(match_item.get('user_id') or '')
-                            if uid_match == user.username and score_v >= threshold:
+                            if uid_match in candidate_ids and score_v >= threshold:
                                 return True, score_v, 'baidu'
                 except Exception:
                     pass
@@ -976,3 +1036,138 @@ def api_manage_face_setting_save(request):
     except Exception:
         return Response({'success': False, 'error_msg': '保存失败'}, status=500)
     return Response({'success': True, 'face_required': on})
+
+
+@api_view(["POST"])  # 管理员重置用户人脸信息（本地+云端）
+def api_manage_face_reset(request):
+    uid = request.session.get('user_id')
+    if not uid:
+        return Response({'success': False, 'error_msg': '未登录'}, status=401)
+    try:
+        me = User.objects.get(user_id=uid)
+    except User.DoesNotExist:
+        return Response({'success': False, 'error_msg': '用户不存在'}, status=401)
+    if me.role != '管理员':
+        return Response({'success': False, 'error_msg': '无权限'}, status=403)
+
+    target_id = request.data.get('user_id') or request.data.get('id')
+    target_name = (request.data.get('username') or '').strip()
+    if not target_id and not target_name:
+        return Response({'success': False, 'error_msg': '缺少用户标识'}, status=400)
+
+    try:
+        if target_id not in (None, ''):
+            target = User.objects.get(user_id=int(target_id))
+        else:
+            target = User.objects.get(username=target_name)
+    except Exception:
+        return Response({'success': False, 'error_msg': '用户不存在'}, status=404)
+
+    local_deleted = False
+    local_msg = ''
+    try:
+        fp = FaceProfile.objects.filter(user=target).first()
+        if fp:
+            try:
+                if fp.image:
+                    fp.image.delete(save=False)
+            except Exception:
+                pass
+            fp.delete()
+            local_deleted = True
+            local_msg = '本地人脸已删除'
+        else:
+            local_deleted = True
+            local_msg = '本地无可删人脸'
+    except Exception:
+        local_msg = '本地删除失败'
+
+    cloud_deleted = False
+    cloud_msg = ''
+    conf = getattr(settings, 'BAIDU_FACE', {})
+    if conf and conf.get('APP_ID') and conf.get('API_KEY') and conf.get('SECRET_KEY'):
+        client, err_c = _get_face_client()
+        if err_c:
+            cloud_msg = err_c
+        else:
+            group_id = conf.get('GROUP_ID', 'exam_users')
+            any_deleted = False
+            fail_count = 0
+            for candidate in _cloud_candidate_ids(target):
+                try:
+                    resp = client.deleteUser(candidate, group_id)
+                    code = int((resp or {}).get('error_code', -1)) if isinstance(resp, dict) else -1
+                    if code in (0, 223103, 223105):
+                        # 0: success; 223103/223105: user/group not found, treated as idempotent success
+                        any_deleted = True
+                    else:
+                        fail_count += 1
+                except Exception:
+                    fail_count += 1
+            if fail_count == 0:
+                cloud_deleted = True
+                cloud_msg = '云端人脸已清理'
+            elif any_deleted:
+                cloud_deleted = True
+                cloud_msg = '云端部分清理完成'
+            else:
+                cloud_msg = '云端删除失败'
+    else:
+        cloud_deleted = True
+        cloud_msg = '云端未配置，已跳过'
+
+    # 删除该用户在 faces_pending 下的历史记录（json + 对应图片）
+    pending_deleted = 0
+    pending_images_deleted = 0
+    try:
+        pending_dir = _media_join('faces_pending')
+        if os.path.isdir(pending_dir):
+            import json
+            for name in os.listdir(pending_dir):
+                if not name.endswith('.json'):
+                    continue
+                meta_abs = os.path.join(pending_dir, name)
+                try:
+                    with open(meta_abs, 'r', encoding='utf-8') as f:
+                        meta = json.load(f)
+                    if int(meta.get('user_id') or 0) != int(target.user_id):
+                        continue
+
+                    img_rel = meta.get('image_rel')
+                    img_abs = _media_join(img_rel) if img_rel else None
+                    if img_abs and os.path.exists(img_abs):
+                        try:
+                            os.remove(img_abs)
+                            pending_images_deleted += 1
+                        except Exception:
+                            pass
+
+                    try:
+                        os.remove(meta_abs)
+                        pending_deleted += 1
+                    except Exception:
+                        pass
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    ok = bool(local_deleted and cloud_deleted)
+    return Response({
+        'success': ok,
+        'user_id': target.user_id,
+        'username': target.username,
+        'local_deleted': local_deleted,
+        'cloud_deleted': cloud_deleted,
+        'pending_deleted': pending_deleted,
+        'pending_images_deleted': pending_images_deleted,
+        'message': f'{local_msg}；{cloud_msg}',
+        'error_msg': None if ok else f'{local_msg}；{cloud_msg}',
+    }, status=200 if ok else 500)
+
+
+try:
+    api_manage_face_reset.throttle_scope = 'face'
+except Exception:
+    pass
+

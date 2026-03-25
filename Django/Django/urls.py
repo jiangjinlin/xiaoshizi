@@ -164,6 +164,7 @@ urlpatterns = [
     path('api/manage/q-comment/delete', views.api_manage_q_comment_delete, name='api_manage_q_comment_delete'),
     path('api/manage/face/setting', views.api_manage_face_setting, name='api_manage_face_setting'),
     path('api/manage/face/setting/save', views.api_manage_face_setting_save, name='api_manage_face_setting_save'),
+    path('api/manage/face/reset', views.api_manage_face_reset, name='api_manage_face_reset'),
 
     # 新增：人脸数据概览
     path('api/manage/face/overview', views.api_manage_face_overview, name='api_manage_face_overview'),

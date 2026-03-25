@@ -32,6 +32,7 @@ export const apiFaceProfile = () => http.get('/api/face/profile')
 // 人脸识别 - 全局设置
 export const apiManageFaceSetting = () => http.get('/api/manage/face/setting')
 export const apiManageFaceSettingSave = (face_required) => http.post('/api/manage/face/setting/save', { face_required })
+export const apiManageFaceReset = (payload) => http.post('/api/manage/face/reset', payload)
 
 // 题目导入/导出
 export const apiQuestionImport = formData => http.post('/api/question-import', formData, { headers:{'Content-Type':'multipart/form-data'} })
