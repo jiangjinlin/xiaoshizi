@@ -63,7 +63,7 @@ def score_word(file_path: str):
     随后深入解析底层 XML 属性特征进行细粒度评分。
 
     返回 (score, total, msg) 三元组：
-    - 标题为“追逐梦想，不负韶华”，并加粗、居中、俳宋、字号14（28 half-points）呅4×5分；
+    - 标题为“追逐梦想，不负韶华”，并加粗、居中、仿宋、字号14（28 half-points）各+5分；
     - 正文首段首行缩进约 480 twips +5分；
     - 文档设置双栏 +5分；
     总分 total=30。
@@ -109,9 +109,9 @@ def score_word(file_path: str):
             if jc is not None and jc.attrib.get('{%s}val' % ns['w']) == 'center':
                 center_ok = True
                 score += 5
-            # 字体（俳宋/东亚字体）
+            # 字体（仿宋/东亚字体）
             rFonts = p.find('.//w:rFonts', ns)
-            if rFonts is not None and rFonts.attrib.get('{%s}eastAsia' % ns['w']) == '俳宋':
+            if rFonts is not None and rFonts.attrib.get('{%s}eastAsia' % ns['w']) == '仿宋':
                 font_ok = True
                 score += 5
             # 字号（14号=28 half-points）
@@ -134,9 +134,9 @@ def score_word(file_path: str):
         else:
             miss.append('未居中')
         if font_ok:
-            details.append('通过：标题字体为俳宋（+5分）')
+            details.append('通过：标题字体为仿宋（+5分）')
         else:
-            miss.append('字体非俳宋')
+            miss.append('字体非仿宋')
         if size_ok:
             details.append('通过：标题字号为14号（+5分）')
         else:
@@ -162,7 +162,7 @@ def score_word(file_path: str):
                     else:
                         details.append(f'未通过：正文首段首行缩进应约 480 twips，实际 {indent_val}（0分）')
                 except Exception:
-                    details.append('未通过：无法解析首行缩进数値（0分）')
+                    details.append('未通过：无法解析首行缩进数值（0分）')
             else:
                 details.append('未通过：未检测到正文首段首行缩进设置（0分）')
             break
