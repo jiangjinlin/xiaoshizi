@@ -16,9 +16,11 @@ const examId = ref('')
 // 摄像头
 const cameraOn = ref(false)
 const videoRef = ref(null)
-const canvasRef = ref(null)
+const canvasRef = ref(null)  // 实时截帧画布（预览渲染 + 抓拍复用）
+const previewCanvasRef = ref(null)  // 实时预览画布
 const snapshot = ref('')
 let mediaStream = null
+let rafId = null  // requestAnimationFrame 句柄
 
 function initParams(){
   const qid = route?.query?.exam_id ? String(route.query.exam_id) : ''
@@ -38,24 +40,75 @@ async function checkStatus(){
   finally{ checking.value = false }
 }
 
+/**
+ * 通过 requestAnimationFrame 机制驱动 Canvas 平滑实时截帧，
+ * 将视频流渲染到预览画布，确保帧率与浏览器刷新率同步。
+ */
+function startFrameLoop(){
+  if (!previewCanvasRef.value || !videoRef.value) return
+  const video = videoRef.value
+  const canvas = previewCanvasRef.value
+  function drawFrame(){
+    if (!cameraOn.value) return
+    const w = video.videoWidth || 640
+    const h = video.videoHeight || 480
+    if (canvas.width !== w) canvas.width = w
+    if (canvas.height !== h) canvas.height = h
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, w, h)
+    rafId = requestAnimationFrame(drawFrame)
+  }
+  rafId = requestAnimationFrame(drawFrame)
+}
+
+function stopFrameLoop(){
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+}
+
 async function startCamera(){
   msg.value = ''
   try{
-    mediaStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:640}, height:{ideal:480} }, audio:false })
-    if (videoRef.value){ videoRef.value.srcObject = mediaStream; await videoRef.value.play() }
+    // 使用 MediaDevices.getUserMedia API 唤醒并调用摄像头
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    })
+    if (videoRef.value){
+      videoRef.value.srcObject = mediaStream
+      await videoRef.value.play()
+    }
     cameraOn.value = true
+    // 启动 requestAnimationFrame 实时截帧循环
+    startFrameLoop()
   }catch{ msg.value = '无法开启摄像头，请检查权限/设备' }
 }
-function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null } cameraOn.value=false }
+
+function stopCamera(){
+  stopFrameLoop()
+  if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null }
+  cameraOn.value = false
+}
+
+/**
+ * 从当前视频帧抓取快照，转换为 Base64 编码的轻量级 JPEG 图像，
+ * 以降低弱网环境下的传输带宽压力。
+ */
 function takeShot(){
   if(!videoRef.value || !canvasRef.value) return
-  const w = videoRef.value.videoWidth || 640
-  const h = videoRef.value.videoHeight || 480
-  canvasRef.value.width = w; canvasRef.value.height = h
+  const video = videoRef.value
+  const w = video.videoWidth || 640
+  const h = video.videoHeight || 480
+  canvasRef.value.width = w
+  canvasRef.value.height = h
   const ctx = canvasRef.value.getContext('2d')
-  ctx.drawImage(videoRef.value, 0, 0, w, h)
+  ctx.drawImage(video, 0, 0, w, h)
+  // 转为 Base64 JPEG 格式，质量 0.9，降低带宽占用
   snapshot.value = canvasRef.value.toDataURL('image/jpeg', 0.9)
 }
+
 async function doSignin(){
   if(!snapshot.value){ msg.value='请先拍照'; return }
   msg.value='识别中...'
@@ -119,8 +172,12 @@ onUnmounted(()=> stopCamera())
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div class="relative w-full aspect-video bg-black/5 rounded overflow-hidden">
-              <video ref="videoRef" autoplay playsinline muted class="w-full h-full object-cover"></video>
+              <!-- 实时预览：通过 requestAnimationFrame 驱动 Canvas 平滑截帧 -->
+              <canvas v-show="cameraOn" ref="previewCanvasRef" class="w-full h-full object-cover"></canvas>
+              <!-- 隐藏的 video 元素作为数据源；隐藏的 canvas 用于抓拍截图 -->
+              <video ref="videoRef" autoplay playsinline muted class="hidden"></video>
               <canvas ref="canvasRef" class="hidden"></canvas>
+              <div v-if="!cameraOn" class="absolute inset-0 flex items-center justify-center text-xs text-gray-400">摄像头未开启</div>
             </div>
             <div class="w-full aspect-video bg-white rounded border border-gray-200 flex items-center justify-center overflow-hidden">
               <img v-if="snapshot" :src="snapshot" alt="snapshot" class="w-full h-full object-cover" />

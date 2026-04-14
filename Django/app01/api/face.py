@@ -794,7 +794,7 @@ def api_face_signin(request):
                 except Exception:
                     threshold = 80.0
                 try:
-                    options = {'max_user_num': 5, 'quality_control': 'LOW', 'liveness_control': 'LOW'}
+                    options = {'max_user_num': 5, 'quality_control': 'LOW', 'liveness_control': 'NORMAL'}
                     img_b64 = base64.b64encode(raw).decode('ascii')
                     resp = client.search(img_b64, 'BASE64', group_id, options)
                     if isinstance(resp, dict) and resp.get('error_code') == 0:
