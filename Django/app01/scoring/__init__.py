@@ -7,7 +7,7 @@
 - 新增一个 {type}.py，提供 score_{type}(file_path) 或 score(file_path) 函数；
 - 在 EXT_TO_SCORER 中注册扩展名到评分函数的映射。
 """
-from .word import score_word  # noqa: F401
+from .word import score_word, get_namespace_map  # noqa: F401
 from .excel import score_excel  # noqa: F401
 from .ppt import score_ppt  # noqa: F401
 import os
